@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "445154804528",
+    "project_id": "lista-compra-e0e02",
+    "storage_bucket": "lista-compra-e0e02.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:445154804528:android:276a0e0ec41da190a7bef5",
+        "android_client_info": {
+          "package_name": "org.insbaixcamp.llistadelacompra"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "445154804528-b2m35u886cecdr3f9i4p0n705g92jvvf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEkH3obkAlhBuImU71he7aUjLjfmJ4sx8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "445154804528-b2m35u886cecdr3f9i4p0n705g92jvvf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
