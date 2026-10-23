@@ -27,6 +27,12 @@ import com.google.firebase.firestore.firestore
 import org.insbaixcamp.llistadelacompra.ui.theme.LlistaDeLaCompraTheme
 import java.util.Date
 
+data class ShoppingItem(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val isChecked: Boolean = false
+)
+
 class MainActivity : ComponentActivity() {
 
     private lateinit var db: FirebaseFirestore
@@ -37,7 +43,10 @@ class MainActivity : ComponentActivity() {
 
         db = Firebase.firestore
 
-
+        val testData = hashMapOf(
+            "mensaje" to "Prueba de conexión"
+            "fecha" to Date()
+        )
 
         db.collection("test_conexion")
             .add(testData)
@@ -99,10 +108,11 @@ enum class AppDestinations(
 
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
+    var texto by rememberSaveable {mutableStateOf("")}
+    Column(modifier = modifier.fillMaxSize()){
+        Text(text = "LISTA DE LA COMPRA BRUTAL")
+
+    }
 }
 
 @Preview(showBackground = true)
