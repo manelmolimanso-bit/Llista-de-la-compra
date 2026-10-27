@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "org.insbaixcamp.llistadelacompra"
+    namespace = "org.insbaixcamp.sharedshoppinglist"
     compileSdk {
         version = release(37)
     }
@@ -50,7 +50,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
     implementation(libs.googleid)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
