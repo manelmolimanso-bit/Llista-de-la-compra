@@ -51,12 +51,9 @@ fun SharedShoppingListApp(
     val scope = rememberCoroutineScope()
     var currentUser by remember { mutableStateOf<FirebaseUser?>(authManager.currentUser) }
     var activeList by remember { mutableStateOf<ShoppingList?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Recompte de llistes en temps real per a l'usuari actual
     val userListsFlow = remember(currentUser) {
         if (currentUser != null) {
             firestoreManager.getListsForUser(currentUser!!.uid)
@@ -66,7 +63,6 @@ fun SharedShoppingListApp(
     }
     val userLists by userListsFlow.collectAsState(initial = emptyList())
 
-    // Recompte de categories i productes en temps real per a la llista activa
     val categoriesFlow = remember(activeList) {
         if (activeList != null) {
             firestoreManager.getCategories(activeList!!.id)
@@ -98,8 +94,6 @@ fun SharedShoppingListApp(
             if (user == null) {
                 LoginScreen(
                     authManager = authManager,
-                    isLoading = isLoading,
-                    errorMessage = errorMessage,
                     onLoginSuccess = {
                         currentUser = authManager.currentUser
                     }
