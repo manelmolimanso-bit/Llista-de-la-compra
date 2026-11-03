@@ -3,9 +3,6 @@ package org.insbaixcamp.llistadelacompra
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -16,31 +13,106 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 
-// 1. MODEL DE DADES: Defineix l'estructura d'un producte
+
 data class Producte(
-    val id: String = UUID.randomUUID().toString(), // Genera un codi únic automàticament
+    val id: String = UUID.randomUUID().toString(),
     val nom: String,
     val categoria: String,
-    val completat: Boolean = false // Per defecte, cap producte està comprat (completat)
+    val completat: Boolean = false
 )
 
-// DICCIONARI INTEL·LIGENT (Característica extra): Relaciona paraules clau amb categories
+
 val autoCategories = mapOf(
+    // Làctics i derivats
     "llet" to "Làctics",
     "formatge" to "Làctics",
+    "iogurt" to "Làctics",
+    "mantega" to "Làctics",
+    "nata" to "Làctics",
+
+    // Fruita
     "pomes" to "Fruita",
+    "plàtans" to "Fruita",
+    "peres" to "Fruita",
+    "taronges" to "Fruita",
+    "maduixes" to "Fruita",
+    "raïm" to "Fruita",
+    "llimones" to "Fruita",
+
+    // Verdura i Hortalisses
+    "enciam" to "Verdura",
+    "tomàquets" to "Verdura",
+    "cebes" to "Verdura",
+    "patates" to "Verdura",
+    "pastanagues" to "Verdura",
+    "pebrots" to "Verdura",
+    "alls" to "Verdura",
+
+    // Carnisseria i Embotits
     "carn" to "Carnisseria",
-    "pa" to "Forn"
+    "pollastre" to "Carnisseria",
+    "vedella" to "Carnisseria",
+    "porc" to "Carnisseria",
+    "salsitxes" to "Carnisseria",
+    "pernil" to "Carnisseria",
+    "embotit" to "Carnisseria",
+    "hamburgueses" to "Carnisseria",
+
+    // Peixateria
+    "peix" to "Peixateria",
+    "salmó" to "Peixateria",
+    "lluç" to "Peixateria",
+    "tonyina" to "Peixateria",
+    "gambes" to "Peixateria",
+    "bacallà" to "Peixateria",
+
+    // Forn i Pastisseria
+    "pa" to "Forn",
+    "croissants" to "Forn",
+    "magdalenes" to "Forn",
+    "galetes" to "Forn",
+    "torrades" to "Forn",
+
+    // Rebost i Bàsics
+    "arròs" to "Rebost",
+    "pasta" to "Rebost",
+    "macarrons" to "Rebost",
+    "espaguetis" to "Rebost",
+    "oli" to "Rebost",
+    "sal" to "Rebost",
+    "sucre" to "Rebost",
+    "farina" to "Rebost",
+    "ous" to "Rebost",
+    "cigrons" to "Rebost",
+    "llenties" to "Rebost",
+
+    // Begudes
+    "aigua" to "Begudes",
+    "cervesa" to "Begudes",
+    "vi" to "Begudes",
+    "suc" to "Begudes",
+    "refresc" to "Begudes",
+    "cafè" to "Begudes",
+
+    // Neteja i Llar
+    "sabó" to "Neteja",
+    "lleixiu" to "Neteja",
+    "detergent" to "Neteja",
+    "suavitzant" to "Neteja",
+    "paper de wàter" to "Neteja",
+    "escombres" to "Neteja",
+
+    // Congelats
+    "gelat" to "Congelats",
+    "pèsols" to "Congelats",
+    "croquetes" to "Congelats",
+    "pizza" to "Congelats"
 )
 
-// 2. PANTALLA PRINCIPAL: On s'ajunta tota la interfície i la lògica
+
 @Composable
 fun ShoppingScreen(modifier: Modifier = Modifier) {
-    // 'llistaProductes' és la memòria de l'app. Quan s'hi afegeix alguna cosa, la pantalla s'actualitza sola.
-    // Més endavant, el teu company connectarà això a Firebase Firestore.
     val llistaProductes = remember { mutableStateListOf<Producte>() }
-
-    // 'nouProducteText' guarda el que l'usuari està teclejant en temps real
     var nouProducteText by remember { mutableStateOf("") }
 
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
@@ -48,48 +120,38 @@ fun ShoppingScreen(modifier: Modifier = Modifier) {
         Text(text = "La meva llista", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
 
-        // CAMP DE TEXT I BOTÓ PER AFEGIR PRODUCTES
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
                 value = nouProducteText,
-                onValueChange = { nouProducteText = it }, // Actualitza la variable cada cop que tecleges
+                onValueChange = { nouProducteText = it },
                 label = { Text("Ex: Llet, Pomes...") },
                 modifier = Modifier.weight(1f),
                 singleLine = true
             )
             Spacer(modifier = Modifier.width(8.dp))
-
             Button(
                 onClick = {
-                    if (nouProducteText.isNotBlank()) { // Comprova que no estiguis afegint un espai en blanc
-                        // AUTOCATEGORITZACIÓ: Busca la paraula en minúscules al diccionari. Si no hi és, posa "Altres".
+                    if (nouProducteText.isNotBlank()) {
                         val cat = autoCategories[nouProducteText.lowercase().trim()] ?: "Altres"
-
-                        // Crea el producte i l'afegeix a la llista visual
                         llistaProductes.add(Producte(nom = nouProducteText.trim(), categoria = cat))
-
-                        // Buida el camp de text per poder escriure el següent producte
                         nouProducteText = ""
                     }
                 }
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Afegir")
+                // Icono cambiado a texto para evitar error de librería
+                Text("+")
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // LLISTA AGRUPADA (LazyColumn només gasta memòria per dibuixar el que es veu a la pantalla)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Reorganitzem la llista base agrupant els productes per la seva categoria
             val productesAgrupats = llistaProductes.groupBy { it.categoria }
 
-            // Recorrem cada grup (ex: primer "Làctics", després "Fruita"...)
             productesAgrupats.forEach { (categoria, productes) ->
-                // Dibuixem el títol de la categoria
                 item {
                     Text(
                         text = categoria,
@@ -98,19 +160,14 @@ fun ShoppingScreen(modifier: Modifier = Modifier) {
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
-                // Dibuixem cada producte que pertany a aquesta categoria cridant al disseny individual
                 items(productes, key = { it.id }) { producte ->
                     ProducteItem(
                         producte = producte,
                         onCheckedChange = { isChecked ->
-                            // Busca el producte a la llista i canvia el seu estat (completat o no)
                             val index = llistaProductes.indexOf(producte)
                             if (index != -1) llistaProductes[index] = producte.copy(completat = isChecked)
                         },
-                        onDelete = {
-                            // Esborra el producte de la llista
-                            llistaProductes.remove(producte)
-                        }
+                        onDelete = { llistaProductes.remove(producte) }
                     )
                 }
             }
@@ -118,7 +175,7 @@ fun ShoppingScreen(modifier: Modifier = Modifier) {
     }
 }
 
-// 3. DISSENY INDIVIDUAL: Com es veu cada targeta de producte
+// 4. DISEÑO DE LA FILA DE PRODUCTO
 @Composable
 fun ProducteItem(
     producte: Producte,
@@ -126,7 +183,6 @@ fun ProducteItem(
     onDelete: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        // Fila per posar el Checkbox, el nom i la paperera un al costat de l'altre
         Row(
             modifier = Modifier.padding(8.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -135,13 +191,13 @@ fun ProducteItem(
             Text(
                 text = producte.nom,
                 modifier = Modifier.weight(1f),
-                // Si el producte està completat, ratlla el text per complir el requisit de no esborrar-lo.
                 style = MaterialTheme.typography.bodyLarge.copy(
                     textDecoration = if (producte.completat) TextDecoration.LineThrough else TextDecoration.None
                 )
             )
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Esborrar", tint = MaterialTheme.colorScheme.error)
+                // Icono cambiado a texto rojo para evitar error de librería
+                Text("X", color = MaterialTheme.colorScheme.error)
             }
         }
     }
