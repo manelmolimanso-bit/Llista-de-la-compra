@@ -15,7 +15,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             LlistaDeLaCompraTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    // Aquí llamamos a tu archivo separado
                     ShoppingScreen(modifier = Modifier.padding(innerPadding))
                 }
             }

@@ -5,115 +5,58 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 
+// IMPORTACIONES DE FIREBASE
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 
+// 1. MODELO DE DATOS
 data class Producte(
     val id: String = UUID.randomUUID().toString(),
-    val nom: String,
-    val categoria: String,
+    val nom: String = "",
+    val categoria: String = "",
     val completat: Boolean = false
 )
 
-
+// 2. DICCIONARIO PARA AUTOCATEGORIZACIÓN
 val autoCategories = mapOf(
-    // Làctics i derivats
-    "llet" to "Làctics",
-    "formatge" to "Làctics",
-    "iogurt" to "Làctics",
-    "mantega" to "Làctics",
-    "nata" to "Làctics",
-
-    // Fruita
-    "pomes" to "Fruita",
-    "plàtans" to "Fruita",
-    "peres" to "Fruita",
-    "taronges" to "Fruita",
-    "maduixes" to "Fruita",
-    "raïm" to "Fruita",
-    "llimones" to "Fruita",
-
-    // Verdura i Hortalisses
-    "enciam" to "Verdura",
-    "tomàquets" to "Verdura",
-    "cebes" to "Verdura",
-    "patates" to "Verdura",
-    "pastanagues" to "Verdura",
-    "pebrots" to "Verdura",
-    "alls" to "Verdura",
-
-    // Carnisseria i Embotits
-    "carn" to "Carnisseria",
-    "pollastre" to "Carnisseria",
-    "vedella" to "Carnisseria",
-    "porc" to "Carnisseria",
-    "salsitxes" to "Carnisseria",
-    "pernil" to "Carnisseria",
-    "embotit" to "Carnisseria",
-    "hamburgueses" to "Carnisseria",
-
-    // Peixateria
-    "peix" to "Peixateria",
-    "salmó" to "Peixateria",
-    "lluç" to "Peixateria",
-    "tonyina" to "Peixateria",
-    "gambes" to "Peixateria",
-    "bacallà" to "Peixateria",
-
-    // Forn i Pastisseria
-    "pa" to "Forn",
-    "croissants" to "Forn",
-    "magdalenes" to "Forn",
-    "galetes" to "Forn",
-    "torrades" to "Forn",
-
-    // Rebost i Bàsics
-    "arròs" to "Rebost",
-    "pasta" to "Rebost",
-    "macarrons" to "Rebost",
-    "espaguetis" to "Rebost",
-    "oli" to "Rebost",
-    "sal" to "Rebost",
-    "sucre" to "Rebost",
-    "farina" to "Rebost",
-    "ous" to "Rebost",
-    "cigrons" to "Rebost",
-    "llenties" to "Rebost",
-
-    // Begudes
-    "aigua" to "Begudes",
-    "cervesa" to "Begudes",
-    "vi" to "Begudes",
-    "suc" to "Begudes",
-    "refresc" to "Begudes",
-    "cafè" to "Begudes",
-
-    // Neteja i Llar
-    "sabó" to "Neteja",
-    "lleixiu" to "Neteja",
-    "detergent" to "Neteja",
-    "suavitzant" to "Neteja",
-    "paper de wàter" to "Neteja",
-    "escombres" to "Neteja",
-
-    // Congelats
-    "gelat" to "Congelats",
-    "pèsols" to "Congelats",
-    "croquetes" to "Congelats",
-    "pizza" to "Congelats"
+    "llet" to "Làctics", "formatge" to "Làctics", "iogurt" to "Làctics", "mantega" to "Làctics",
+    "pomes" to "Fruita", "plàtans" to "Fruita", "taronges" to "Fruita", "llimones" to "Fruita",
+    "enciam" to "Verdura", "tomàquets" to "Verdura", "cebes" to "Verdura", "patates" to "Verdura",
+    "carn" to "Carnisseria", "pollastre" to "Carnisseria", "vedella" to "Carnisseria", "porc" to "Carnisseria",
+    "peix" to "Peixateria", "salmó" to "Peixateria", "tonyina" to "Peixateria",
+    "pa" to "Forn", "croissants" to "Forn", "galetes" to "Forn",
+    "arròs" to "Rebost", "pasta" to "Rebost", "oli" to "Rebost", "sal" to "Rebost", "ous" to "Rebost",
+    "aigua" to "Begudes", "cervesa" to "Begudes", "vi" to "Begudes", "refresc" to "Begudes",
+    "sabó" to "Neteja", "lleixiu" to "Neteja", "detergent" to "Neteja", "paper de wàter" to "Neteja",
+    "gelat" to "Congelats", "pèsols" to "Congelats", "pizza" to "Congelats"
 )
 
-
+// 3. PANTALLA PRINCIPAL
 @Composable
 fun ShoppingScreen(modifier: Modifier = Modifier) {
+    val db = Firebase.firestore
     val llistaProductes = remember { mutableStateListOf<Producte>() }
     var nouProducteText by remember { mutableStateOf("") }
+
+    // DESCARGAR DATOS DE FIREBASE EN TIEMPO REAL
+    LaunchedEffect(Unit) {
+        db.collection("shopping_lists").document("lista_de_prueba").collection("productes")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    llistaProductes.clear()
+                    for (document in snapshot.documents) {
+                        val producte = document.toObject(Producte::class.java)
+                        if (producte != null) llistaProductes.add(producte)
+                    }
+                }
+            }
+    }
 
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
 
@@ -136,12 +79,16 @@ fun ShoppingScreen(modifier: Modifier = Modifier) {
                 onClick = {
                     if (nouProducteText.isNotBlank()) {
                         val cat = autoCategories[nouProducteText.lowercase().trim()] ?: "Altres"
-                        llistaProductes.add(Producte(nom = nouProducteText.trim(), categoria = cat))
+                        val nouProducte = Producte(nom = nouProducteText.trim(), categoria = cat)
+
+                        // SUBIR NUEVO PRODUCTO A FIREBASE
+                        db.collection("shopping_lists").document("lista_de_prueba").collection("productes")
+                            .document(nouProducte.id).set(nouProducte)
+
                         nouProducteText = ""
                     }
                 }
             ) {
-                // Icono cambiado a texto para evitar error de librería
                 Text("+")
             }
         }
@@ -164,10 +111,15 @@ fun ShoppingScreen(modifier: Modifier = Modifier) {
                     ProducteItem(
                         producte = producte,
                         onCheckedChange = { isChecked ->
-                            val index = llistaProductes.indexOf(producte)
-                            if (index != -1) llistaProductes[index] = producte.copy(completat = isChecked)
+                            // ACTUALIZAR ESTADO DEL CHECKBOX EN FIREBASE
+                            db.collection("shopping_lists").document("lista_de_prueba").collection("productes")
+                                .document(producte.id).update("completat", isChecked)
                         },
-                        onDelete = { llistaProductes.remove(producte) }
+                        onDelete = {
+                            // BORRAR PRODUCTO DE FIREBASE
+                            db.collection("shopping_lists").document("lista_de_prueba").collection("productes")
+                                .document(producte.id).delete()
+                        }
                     )
                 }
             }
@@ -196,7 +148,6 @@ fun ProducteItem(
                 )
             )
             IconButton(onClick = onDelete) {
-                // Icono cambiado a texto rojo para evitar error de librería
                 Text("X", color = MaterialTheme.colorScheme.error)
             }
         }
