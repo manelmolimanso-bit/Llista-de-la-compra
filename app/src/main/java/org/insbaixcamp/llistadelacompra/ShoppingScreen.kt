@@ -12,8 +12,8 @@ import androidx.compose.ui.unit.dp
 import java.util.UUID
 
 // IMPORTACIONES DE FIREBASE
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
 
 // 1. MODELO DE DATOS
 data class Producte(
@@ -181,7 +181,7 @@ val autoCategories = mapOf(
 
 // 3. PANTALLA PRINCIPAL
 @Composable
-fun ShoppingScreen(modifier: Modifier = Modifier) {
+fun ShoppingScreen(modifier: Modifier = Modifier, userEmail: String) {
     val db = Firebase.firestore
     val llistaProductes = remember { mutableStateListOf<Producte>() }
     var nouProducteText by remember { mutableStateOf("") }

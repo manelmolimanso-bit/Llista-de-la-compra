@@ -109,5 +109,6 @@ fun HomeScreen(
         ) {
             Text(text = "Cerrar sesión")
         }
+        ShoppingScreen(userEmail = user.email ?: "")
     }
 }
