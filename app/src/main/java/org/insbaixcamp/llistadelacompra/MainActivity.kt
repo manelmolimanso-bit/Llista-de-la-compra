@@ -1,113 +1,114 @@
 package org.insbaixcamp.llistadelacompra
 
-import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.firebase.auth.FirebaseUser
-import org.insbaixcamp.llistadelacompra.ui.screens.LoginScreen
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewScreenSizes
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.firestore
 import org.insbaixcamp.llistadelacompra.ui.theme.LlistaDeLaCompraTheme
-import org.insbaixcamp.llistadelacompra.ui.viewmodel.AuthViewModel
+import java.util.Date
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var db: FirebaseFirestore
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        db = Firebase.firestore
+        val testData = hashMapOf("mensaje" to "Hola desde Android", "fecha" to Date())
+
+
+        db.collection("test_conexion")
+            .add(testData)
+            .addOnSuccessListener { doc ->
+                Log.d("FIREBASE_TEST", "¡CONEXIÓN EXITOSA! ID: ${doc.id}")
+            }
+            .addOnFailureListener { error ->
+                Log.e("FIREBASE_TEST", "ERROR AL CONECTAR:", error)
+            }
+        // ==========================================
+
         setContent {
             LlistaDeLaCompraTheme {
-                MainApp()
+                AuthGate { LlistaDeLaCompraApp() }
             }
         }
     }
 }
 
+@PreviewScreenSizes
 @Composable
-fun MainApp(
-    authViewModel: AuthViewModel = viewModel()
-) {
-    // Comprobar el usuario actual autenticado en Firebase
-    val currentUser by authViewModel.currentUser.collectAsState()
+fun LlistaDeLaCompraApp() {
+    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // Mostrar LoginScreen si no hay usuario, o HomeScreen si ya inició sesión
-            if (currentUser == null) {
-                LoginScreen(authViewModel = authViewModel)
-            } else {
-                HomeScreen(
-                    user = currentUser!!,
-                    onSignOut = { context -> authViewModel.signOut(context) }
+    NavigationSuiteScaffold(
+        navigationSuiteItems = {
+            AppDestinations.entries.forEach {
+                item(
+                    icon = {
+                        Icon(
+                            painterResource(it.icon),
+                            contentDescription = it.label
+                        )
+                    },
+                    label = { Text(it.label) },
+                    selected = it == currentDestination,
+                    onClick = { currentDestination = it }
                 )
             }
         }
+    ) {
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            Greeting(
+                name = "Android",
+                modifier = Modifier.padding(innerPadding)
+            )
+        }
     }
 }
 
-// Pantalla provisional al iniciar sesión con éxito
-@Composable
-fun HomeScreen(
-    user: FirebaseUser,
-    onSignOut: (Context) -> Unit
+enum class AppDestinations(
+    val label: String,
+    val icon: Int,
 ) {
-    val context = LocalContext.current
-    val displayName = user.displayName ?: user.email ?: "Usuario"
+    HOME("Home", R.drawable.ic_home),
+    FAVORITES("Favorites", R.drawable.ic_favorite),
+    PROFILE("Profile", R.drawable.ic_account_box),
+}
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Hola, $displayName",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
+@Composable
+fun Greeting(name: String, modifier: Modifier = Modifier) {
+    Text(
+        text = "Hello $name!",
+        modifier = modifier
+    )
+}
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = user.email ?: "",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Botón para cerrar sesión (signOut + clearCredentialState)
-        Button(
-            onClick = { onSignOut(context) },
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-        ) {
-            Text(text = "Cerrar sesión")
-        }
+@Preview(showBackground = true)
+@Composable
+fun GreetingPreview() {
+    LlistaDeLaCompraTheme {
+        Greeting("Android")
     }
 }
