@@ -1,5 +1,9 @@
 package org.insbaixcamp.llistadelacompra
 
+import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,16 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,17 +27,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import com.google.android.gms.tasks.Task
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
 
@@ -45,13 +48,17 @@ fun AuthScreen() {
     val context = LocalContext.current
     val auth = remember { FirebaseAuth.getInstance() }
     val scope = rememberCoroutineScope()
+    // Identificador del client web de Firebase (client_type 3 de google-services.json)
+    val webClientId = "445154804528-b2m35u886cecdr3f9i4p0n705g92jvvf.apps.googleusercontent.com"
 
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
 
-    // Quan el login va be, FirebaseAuth avisa a LlistaDeLaCompraApp i canvia de pantalla sol.
+    // Fa que la pantalla d'inici de sessió aparegui amb un fos suau en lloc d'aparèixer de cop.
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    // Quan el login va be, FirebaseAuth avisa a AuthGate i canvia de pantalla sol.
     fun handle(task: Task<AuthResult>) {
         task.addOnCompleteListener {
             loading = false
@@ -59,28 +66,12 @@ fun AuthScreen() {
         }
     }
 
-    fun emailAction(create: Boolean) {
-        val e = email.trim()
-        if (e.isEmpty() || password.isEmpty()) {
-            error = "Escriu el correu i la contrasenya"
-            return
-        }
-        loading = true
-        error = null
-        handle(
-            if (create) auth.createUserWithEmailAndPassword(e, password)
-            else auth.signInWithEmailAndPassword(e, password)
-        )
-    }
-
     fun googleSignIn() {
         loading = true
         error = null
         scope.launch {
             try {
-                val option = GetSignInWithGoogleOption.Builder(
-                    context.getString(R.string.default_web_client_id)
-                ).build()
+                val option = GetSignInWithGoogleOption.Builder(webClientId).build()
                 val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
                 val credential = CredentialManager.create(context).getCredential(context, request).credential
                 if (credential is CustomCredential &&
@@ -92,6 +83,9 @@ fun AuthScreen() {
                     loading = false
                     error = "No s'ha pogut obtenir el compte de Google"
                 }
+            } catch (e: GetCredentialCancellationException) {
+                // Si l'usuari tanca el diàleg de Google no es mostra cap error.
+                loading = false
             } catch (e: Exception) {
                 loading = false
                 error = e.localizedMessage ?: "Error en iniciar sessió amb Google"
@@ -99,62 +93,47 @@ fun AuthScreen() {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .safeDrawingPadding()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("Llista de la compra", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(24.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Correu") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Contrasenya") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        error?.let {
+    AnimatedVisibility(visible = visible, enter = fadeIn(animationSpec = tween(600))) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Llista de la compra", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-        }
+            Text(
+                "Inicia sessió amb Google per continuar",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
-        Spacer(Modifier.height(16.dp))
-        if (loading) {
-            CircularProgressIndicator()
-        } else {
-            Button(onClick = { emailAction(create = false) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Entra")
+            error?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
-            TextButton(onClick = { emailAction(create = true) }) { Text("Crea un compte nou") }
-            OutlinedButton(onClick = { googleSignIn() }, modifier = Modifier.fillMaxWidth()) {
-                Text("Continua amb Google")
+
+            Spacer(Modifier.height(32.dp))
+            if (loading) {
+                CircularProgressIndicator()
+            } else {
+                Button(onClick = { googleSignIn() }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Continua amb Google")
+                }
             }
         }
     }
 }
 
 /**
- * Envolta l'app: si no hi ha sessio iniciada mostra el login,
- * i quan l'usuari entra mostra el contingut tal com estava.
+ * Envolta l'app: si no hi ha sessio iniciada mostra el login
+ * quan l'usuari entra mostra el contingut tal com estava
+ * El contingut rep l'usuari que ha iniciat sessió
  */
 @Composable
-fun AuthGate(content: @Composable () -> Unit) {
+fun AuthGate(content: @Composable (FirebaseUser) -> Unit) {
     val auth = remember { FirebaseAuth.getInstance() }
     var user by remember { mutableStateOf(auth.currentUser) }
 
@@ -164,5 +143,16 @@ fun AuthGate(content: @Composable () -> Unit) {
         onDispose { auth.removeAuthStateListener(listener) }
     }
 
-    if (user == null) AuthScreen() else content()
+    val currentUser = user
+    if (currentUser == null) AuthScreen() else content(currentUser)
+}
+
+/**
+ * Tanca la sessió de Firebase i esborra l'estat de credencials de Google,
+ * de manera que en tornar a entrar es pugui triar el compte de nou.
+ * En tancar-la, AuthGate torna a mostrar la pantalla d'inici de sessió.
+ */
+suspend fun signOut(context: Context) {
+    FirebaseAuth.getInstance().signOut()
+    CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest())
 }

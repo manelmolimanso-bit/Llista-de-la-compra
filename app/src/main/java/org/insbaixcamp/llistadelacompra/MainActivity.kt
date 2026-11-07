@@ -7,29 +7,26 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseUser
-import org.insbaixcamp.llistadelacompra.ui.screens.LoginScreen
+import kotlinx.coroutines.launch
 import org.insbaixcamp.llistadelacompra.ui.theme.LlistaDeLaCompraTheme
-import org.insbaixcamp.llistadelacompra.ui.viewmodel.AuthViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,25 +42,23 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainApp(
-    authViewModel: AuthViewModel = viewModel()
-) {
-    // Comprobar el usuario actual autenticado en Firebase
-    val currentUser by authViewModel.currentUser.collectAsState()
+fun MainApp() {
+    // Corrutina per poder tancar la sessió (signOut) des del botó
+    val scope = rememberCoroutineScope()
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Surface(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                // Evita que el login apliqui dues vegades els marges de la barra del sistema
+                .consumeWindowInsets(innerPadding)
         ) {
-            // Mostrar LoginScreen si no hay usuario, o HomeScreen si ya inició sesión
-            if (currentUser == null) {
-                LoginScreen(authViewModel = authViewModel)
-            } else {
+            // AuthGate mostra el login si no hi ha usuari, o HomeScreen si ja ha iniciat sessió
+            AuthGate { user ->
                 HomeScreen(
-                    user = currentUser!!,
-                    onSignOut = { context -> authViewModel.signOut(context) }
+                    user = user,
+                    onSignOut = { context -> scope.launch { signOut(context) } }
                 )
             }
         }
@@ -79,36 +74,30 @@ fun HomeScreen(
     val context = LocalContext.current
     val displayName = user.displayName ?: user.email ?: "Usuario"
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Hola, $displayName",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = user.email ?: "",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Botón para cerrar sesión (signOut + clearCredentialState)
-        Button(
-            onClick = { onSignOut(context) },
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Barra superior discreta: nom de l'usuari a l'esquerra i botó de tancar sessió a la dreta
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "Cerrar sesión")
+            Text(
+                text = "Hola, $displayName",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Botón para cerrar sesión (signOut + clearCredentialState)
+            TextButton(onClick = { onSignOut(context) }) {
+                Text(text = "Tancar Sessió")
+            }
         }
-        ShoppingScreen(userEmail = user.email ?: "")
+
+        ShoppingScreen(modifier = Modifier.weight(1f), userEmail = user.email ?: "")
     }
 }

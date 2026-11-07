@@ -1,5 +1,6 @@
 package org.insbaixcamp.llistadelacompra
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -257,6 +258,8 @@ fun ShoppingScreen(modifier: Modifier = Modifier, userEmail: String) {
                 }
                 items(productes, key = { it.id }) { producte ->
                     ProducteItem(
+                        // Les files s'animen suaument en afegir-se, eliminar-se o canviar de lloc
+                        modifier = Modifier.animateItem(),
                         producte = producte,
                         onCheckedChange = { isChecked ->
                             // ACTUALIZAR ESTADO DEL CHECKBOX EN FIREBASE
@@ -280,9 +283,18 @@ fun ShoppingScreen(modifier: Modifier = Modifier, userEmail: String) {
 fun ProducteItem(
     producte: Producte,
     onCheckedChange: (Boolean) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    // El text d'un producte completat es va atenuant de manera progressiva
+    val colorText by animateColorAsState(
+        targetValue = MaterialTheme.colorScheme.onSurface.copy(
+            alpha = if (producte.completat) 0.5f else 1f
+        ),
+        label = "colorProducte"
+    )
+
+    Card(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(8.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -291,6 +303,7 @@ fun ProducteItem(
             Text(
                 text = producte.nom,
                 modifier = Modifier.weight(1f),
+                color = colorText,
                 style = MaterialTheme.typography.bodyLarge.copy(
                     textDecoration = if (producte.completat) TextDecoration.LineThrough else TextDecoration.None,
 
