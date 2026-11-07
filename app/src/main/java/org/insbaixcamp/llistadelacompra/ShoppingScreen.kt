@@ -1,6 +1,7 @@
 package org.insbaixcamp.llistadelacompra
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +24,15 @@ data class Producte(
     val categoria: String = "",
     val completat: Boolean = false
 )
+
+// Categoria creada a mà dins d'una llista; els productes la referencien pel nom
+data class Categoria(
+    val id: String = UUID.randomUUID().toString(),
+    val nom: String = ""
+)
+
+// Categoria per defecte on van els productes sense categoria coneguda; no es pot editar ni eliminar
+const val CATEGORIA_PER_DEFECTE = "Altres"
 
 // 2. DICCIONARIO PARA AUTOCATEGORIZACIÓN (Bilingüe y Masivo)
 val autoCategories = mapOf(
@@ -182,28 +192,87 @@ val autoCategories = mapOf(
 
 // 3. PANTALLA PRINCIPAL
 @Composable
-fun ShoppingScreen(modifier: Modifier = Modifier, userEmail: String) {
+fun ShoppingScreen(modifier: Modifier = Modifier, userEmail: String, listId: String, listName: String) {
     val db = Firebase.firestore
+    // Referències a la llista oberta: els productes i les categories són subcol·leccions
+    val productesRef = db.collection("shopping_lists").document(listId).collection("productes")
+    val categoriesRef = db.collection("shopping_lists").document(listId).collection("categories")
     val llistaProductes = remember { mutableStateListOf<Producte>() }
+    val llistaCategories = remember { mutableStateListOf<Categoria>() }
     var nouProducteText by remember { mutableStateOf("") }
 
+    // Diàlegs oberts: nova categoria, categoria que s'edita (pel nom) i producte que s'edita
+    var novaCategoria by remember { mutableStateOf(false) }
+    var categoriaEditant by remember { mutableStateOf<String?>(null) }
+    var producteEditant by remember { mutableStateOf<Producte?>(null) }
+
     // DESCARGAR DATOS DE FIREBASE EN TIEMPO REAL
-    LaunchedEffect(Unit) {
-        db.collection("shopping_lists").document("lista_de_prueba").collection("productes")
-            .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    llistaProductes.clear()
-                    for (document in snapshot.documents) {
-                        val producte = document.toObject(Producte::class.java)
-                        if (producte != null) llistaProductes.add(producte)
-                    }
+    // Els listeners s'aturen en sortir de la llista per no acumular-ne
+    DisposableEffect(listId) {
+        val registreProductes = productesRef.addSnapshotListener { snapshot, _ ->
+            if (snapshot != null) {
+                llistaProductes.clear()
+                for (document in snapshot.documents) {
+                    val producte = document.toObject(Producte::class.java)
+                    if (producte != null) llistaProductes.add(producte)
                 }
             }
+        }
+        val registreCategories = categoriesRef.addSnapshotListener { snapshot, _ ->
+            if (snapshot != null) {
+                llistaCategories.clear()
+                for (document in snapshot.documents) {
+                    val categoria = document.toObject(Categoria::class.java)
+                    if (categoria != null) llistaCategories.add(categoria)
+                }
+            }
+        }
+        onDispose {
+            registreProductes.remove()
+            registreCategories.remove()
+        }
+    }
+
+    // Noms de categoria visibles: les creades a mà (encara que estiguin buides) i les que ja usen productes
+    val nomsCategories = (llistaCategories.map { it.nom } + llistaProductes.map { it.categoria })
+        .filter { it.isNotBlank() }
+        .distinct()
+        .sortedWith(compareBy({ it == CATEGORIA_PER_DEFECTE }, { it.lowercase() }))
+
+    // Canvia el nom d'una categoria i el dels productes que hi pertanyen
+    fun reanomenarCategoria(antic: String, nou: String) {
+        val lot = db.batch()
+        val existent = llistaCategories.firstOrNull { it.nom == antic }
+        if (existent != null) {
+            lot.update(categoriesRef.document(existent.id), "nom", nou)
+        } else {
+            val creada = Categoria(nom = nou)
+            lot.set(categoriesRef.document(creada.id), creada)
+        }
+        llistaProductes.filter { it.categoria == antic }.forEach {
+            lot.update(productesRef.document(it.id), "categoria", nou)
+        }
+        lot.commit()
+    }
+
+    // Elimina la categoria; els seus productes passen a la categoria per defecte
+    fun eliminarCategoria(nom: String) {
+        val lot = db.batch()
+        llistaCategories.filter { it.nom == nom }.forEach { lot.delete(categoriesRef.document(it.id)) }
+        llistaProductes.filter { it.categoria == nom }.forEach {
+            lot.update(productesRef.document(it.id), "categoria", CATEGORIA_PER_DEFECTE)
+        }
+        lot.commit()
     }
 
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
 
-        Text(text = "LA MEVA LLISTA DE COMPRA", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = listName,
+            style = MaterialTheme.typography.headlineMedium,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+        )
         Spacer(modifier = Modifier.height(16.dp))
 
 
@@ -223,12 +292,11 @@ fun ShoppingScreen(modifier: Modifier = Modifier, userEmail: String) {
             Button(
                 onClick = {
                     if (nouProducteText.isNotBlank()) {
-                        val cat = autoCategories[nouProducteText.lowercase().trim()] ?: "Altres"
+                        val cat = autoCategories[nouProducteText.lowercase().trim()] ?: CATEGORIA_PER_DEFECTE
                         val nouProducte = Producte(nom = nouProducteText.trim(), categoria = cat)
 
                         // SUBIR NUEVO PRODUCTO A FIREBASE
-                        db.collection("shopping_lists").document("lista_de_prueba").collection("productes")
-                            .document(nouProducte.id).set(nouProducte)
+                        productesRef.document(nouProducte.id).set(nouProducte)
 
                         nouProducteText = ""
                     }
@@ -238,7 +306,11 @@ fun ShoppingScreen(modifier: Modifier = Modifier, userEmail: String) {
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        TextButton(onClick = { novaCategoria = true }) {
+            Text("+ Categoria")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
 
         LazyColumn(
@@ -247,14 +319,29 @@ fun ShoppingScreen(modifier: Modifier = Modifier, userEmail: String) {
         ) {
             val productesAgrupats = llistaProductes.groupBy { it.categoria }
 
-            productesAgrupats.forEach { (categoria, productes) ->
-                item {
-                    Text(
-                        text = categoria,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
+            nomsCategories.forEach { categoria ->
+                val productes = productesAgrupats[categoria].orEmpty()
+                item(key = "categoria_$categoria") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).animateItem(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = categoria,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        // La categoria per defecte no es pot editar ni eliminar
+                        if (categoria != CATEGORIA_PER_DEFECTE) {
+                            TextButton(onClick = { categoriaEditant = categoria }) {
+                                Text("Edita")
+                            }
+                            IconButton(onClick = { eliminarCategoria(categoria) }) {
+                                Text("X", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
                 }
                 items(productes, key = { it.id }) { producte ->
                     ProducteItem(
@@ -263,19 +350,158 @@ fun ShoppingScreen(modifier: Modifier = Modifier, userEmail: String) {
                         producte = producte,
                         onCheckedChange = { isChecked ->
                             // ACTUALIZAR ESTADO DEL CHECKBOX EN FIREBASE
-                            db.collection("shopping_lists").document("lista_de_prueba").collection("productes")
-                                .document(producte.id).update("completat", isChecked)
+                            productesRef.document(producte.id).update("completat", isChecked)
                         },
                         onDelete = {
                             // BORRAR PRODUCTO DE FIREBASE
-                            db.collection("shopping_lists").document("lista_de_prueba").collection("productes")
-                                .document(producte.id).delete()
-                        }
+                            productesRef.document(producte.id).delete()
+                        },
+                        onEdit = { producteEditant = producte }
                     )
                 }
             }
         }
     }
+
+    if (novaCategoria) {
+        NomDialog(
+            titol = "Nova categoria",
+            valorInicial = "",
+            validacio = { nom ->
+                when {
+                    nom.isBlank() -> "El nom és obligatori"
+                    nomsCategories.any { it.equals(nom, ignoreCase = true) } -> "Aquesta categoria ja existeix"
+                    else -> null
+                }
+            },
+            onConfirm = { nom ->
+                val creada = Categoria(nom = nom)
+                categoriesRef.document(creada.id).set(creada)
+                novaCategoria = false
+            },
+            onDismiss = { novaCategoria = false }
+        )
+    }
+
+    categoriaEditant?.let { antic ->
+        NomDialog(
+            titol = "Edita la categoria",
+            valorInicial = antic,
+            validacio = { nom ->
+                when {
+                    nom.isBlank() -> "El nom és obligatori"
+                    // El mateix nom (encara que canviï les majúscules) no compta com a duplicat
+                    !nom.equals(antic, ignoreCase = true) &&
+                        nomsCategories.any { it.equals(nom, ignoreCase = true) } -> "Aquesta categoria ja existeix"
+                    else -> null
+                }
+            },
+            onConfirm = { nom ->
+                if (nom != antic) reanomenarCategoria(antic, nom)
+                categoriaEditant = null
+            },
+            onDismiss = { categoriaEditant = null }
+        )
+    }
+
+    producteEditant?.let { producte ->
+        ProducteDialog(
+            producte = producte,
+            categories = (nomsCategories + CATEGORIA_PER_DEFECTE).distinct(),
+            onConfirm = { nom, categoria ->
+                productesRef.document(producte.id).update(mapOf("nom" to nom, "categoria" to categoria))
+                producteEditant = null
+            },
+            onDismiss = { producteEditant = null }
+        )
+    }
+}
+
+// Diàleg amb un camp de text de nom obligatori; validacio retorna el motiu de l'error o null si és vàlid
+@Composable
+private fun NomDialog(
+    titol: String,
+    valorInicial: String,
+    validacio: (String) -> String?,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf(valorInicial) }
+    val nom = text.trim()
+    val error = validacio(nom)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(titol) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Nom") },
+                singleLine = true,
+                // No es mostra l'error mentre el camp està buit
+                supportingText = { if (error != null && nom.isNotEmpty()) Text(error) }
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(nom) }, enabled = error == null) { Text("Desa") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel·la") }
+        }
+    )
+}
+
+// Diàleg per editar el nom (obligatori) i la categoria d'un producte
+@Composable
+private fun ProducteDialog(
+    producte: Producte,
+    categories: List<String>,
+    onConfirm: (String, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf(producte.nom) }
+    var categoria by remember { mutableStateOf(producte.categoria) }
+    var menuObert by remember { mutableStateOf(false) }
+    val nom = text.trim()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edita el producte") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Nom") },
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Box {
+                    OutlinedButton(onClick = { menuObert = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(categoria)
+                    }
+                    DropdownMenu(expanded = menuObert, onDismissRequest = { menuObert = false }) {
+                        categories.forEach { opcio ->
+                            DropdownMenuItem(
+                                text = { Text(opcio) },
+                                onClick = {
+                                    categoria = opcio
+                                    menuObert = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(nom, categoria) }, enabled = nom.isNotEmpty()) { Text("Desa") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel·la") }
+        }
+    )
 }
 
 // 4. DISEÑO DE LA FILA DE PRODUCTO
@@ -284,6 +510,7 @@ fun ProducteItem(
     producte: Producte,
     onCheckedChange: (Boolean) -> Unit,
     onDelete: () -> Unit,
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // El text d'un producte completat es va atenuant de manera progressiva
@@ -302,7 +529,8 @@ fun ProducteItem(
             Checkbox(checked = producte.completat, onCheckedChange = onCheckedChange)
             Text(
                 text = producte.nom,
-                modifier = Modifier.weight(1f),
+                // En tocar el nom s'obre l'edició del producte
+                modifier = Modifier.weight(1f).clickable(onClick = onEdit),
                 color = colorText,
                 style = MaterialTheme.typography.bodyLarge.copy(
                     textDecoration = if (producte.completat) TextDecoration.LineThrough else TextDecoration.None,
